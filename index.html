@@ -5,25 +5,25 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Snake Math – Fracciones</title>
 
-  <!-- KaTeX para la operación -->
+  <!-- KaTeX -->
   <link rel="stylesheet"
         href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.15.3/katex.min.css">
   <script defer
           src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.15.3/katex.min.js"></script>
 
-  <!-- Fuente Roboto -->
+  <!-- Roboto -->
   <link rel="stylesheet"
         href="https://fonts.googleapis.com/css?family=Roboto:400,700&display=swap">
 
   <style>
     :root{
-      --primary:#03DAC6;      /* cian brillante */
-      --bg:#121212;           /* fondo dark */
-      --text:#ECEFF1;         /* texto claro */
-      --accent:#BB86FC;       /* violeta */
-      --food:#F4511E;         /* naranja intenso */
-      --snake:#4CAF50;        /* verde */
-      --timer:#FFB300;        /* ámbar */
+      --primary:#03DAC6;
+      --bg:#121212;
+      --text:#ECEFF1;
+      --accent:#BB86FC;
+      --food:#F4511E;
+      --snake:#4CAF50;
+      --timer:#FFB300;
     }
 
     *{box-sizing:border-box;margin:0;padding:0}
@@ -38,7 +38,6 @@
       overflow:hidden;
     }
 
-    /* Pantallas */
     .screen{
       display:none;
       flex-direction:column;
@@ -47,64 +46,38 @@
       gap:1rem;
       width:100%;
       height:100%;
-      max-width:600px;
+      max-width:680px;                 /* ↔ un poco más ancho */
       animation:fade .4s ease-out;
       padding:1rem;
     }
     .active{display:flex}
     @keyframes fade{from{opacity:0;transform:translateY(20px)}to{opacity:1}}
 
-    /* Tipografía & botones */
-    h1{color:var(--primary);font-size:2rem;text-align:center}
+    h1{color:var(--primary);font-size:2.2rem;text-align:center}
     button{
-      background:var(--primary);
-      color:#000;
-      border:none;
-      padding:.7rem 1.6rem;
-      font-size:1rem;
-      border-radius:25px;
-      cursor:pointer;
-      transition:.25s;
-      box-shadow:0 4px 6px rgba(0,0,0,.4)
+      background:var(--primary);color:#000;border:none;
+      padding:.8rem 2rem;font-size:1.05rem;border-radius:25px;
+      cursor:pointer;transition:.25s;box-shadow:0 4px 6px rgba(0,0,0,.4)
     }
     button:hover{filter:brightness(1.1);transform:scale(1.05)}
 
-    /* HUD */
-    #hud{
-      display:flex;
-      flex-direction:column;
-      gap:.4rem;
-      align-items:center;
-      width:100%;
-    }
+    #hud{display:flex;flex-direction:column;gap:.45rem;align-items:center;width:100%}
     .badge{
-      background:#1E1E1E;
-      padding:.55rem 1.1rem;
-      border-radius:20px;
-      font-size:1.1rem;
-      box-shadow:0 2px 4px rgba(0,0,0,.5)
+      background:#1E1E1E;padding:.6rem 1.2rem;border-radius:20px;
+      font-size:1.15rem;box-shadow:0 2px 4px rgba(0,0,0,.5)
     }
     #timer{color:var(--timer)}
 
-    /* Área de juego */
+    /* área de juego: más grande */
     #game-area{
-      position:relative;
-      width:90vmin;      /* responsivo cuadrado */
-      max-width:380px;
+      width:95vmin;            /* usa casi toda la altura en móviles */
+      max-width:460px;         /* límite en desktop */
       aspect-ratio:1/1;
+      position:relative;
     }
     canvas{
-      width:100%;
-      height:100%;
-      background:#000;
-      border:2px solid var(--primary);
-      border-radius:10px;
-      touch-action:none;
-    }
-
-    @media(min-width:700px){
-      h1{font-size:2.3rem}
-      button{font-size:1.05rem}
+      width:100%;height:100%;background:#000;
+      border:2px solid var(--primary);border-radius:10px;touch-action:none;
     }
   </style>
 </head>
@@ -126,33 +99,32 @@
     <div id="game-area"><canvas id="board"></canvas></div>
   </section>
 
-  <!-- Fin de partida -->
+  <!-- Fin partida -->
   <section id="gameOver" class="screen">
     <h1>¡Buen intento!</h1>
     <div id="final" class="badge">Puntuación 0</div>
     <button id="btnAgain">Intentar otra vez</button>
   </section>
 
-  <!-- Fin de sesión -->
+  <!-- Fin sesión -->
   <section id="sessionOver" class="screen">
     <h1>Sesión terminada</h1>
-    <div id="history" class="badge" style="max-height:40vh;overflow:auto"></div>
+    <div id="history" class="badge" style="max-height:45vh;overflow:auto"></div>
     <button id="btnNew">Nueva sesión</button>
   </section>
 
   <script>
-    /* === utilidades === */
-    const $ = id => document.getElementById(id);
-    const css = n => getComputedStyle(document.documentElement)
-                     .getPropertyValue(n).trim();
+    /* utilidades */
+    const $ = id=>document.getElementById(id);
+    const css = v=>getComputedStyle(document.documentElement).getPropertyValue(v).trim();
     const rnd=(m,n)=>Math.floor(Math.random()*(n-m+1))+m;
 
-    /* === Juego === */
     class SnakeMath{
       constructor(){
         this.cv=$('board');this.ctx=this.cv.getContext('2d');
-        this.size=28;                  // celda más grande
-        this.cv.width=this.cv.height=392;   // 14×14 celdas
+        this.size=28;                     // celda
+        this.grid=16;                     // 16×16 ⇒ 448 px
+        this.cv.width=this.cv.height=this.size*this.grid;
 
         this.dir='right';this.next='right';
         this.snake=[];this.food=[];
@@ -163,40 +135,34 @@
 
         this.scores=[];this.gamesMax=10;
 
-        this.touchX=null;this.touchY=null;
+        this.tX=null;this.tY=null;
 
-        this.init();
-        this.events();
+        this.init();this.events();
       }
 
       init(){
-        this.snake=[{x:6,y:10},{x:5,y:10},{x:4,y:10}];
+        this.snake=[{x:8,y:10},{x:7,y:10},{x:6,y:10}];
         this.dir=this.next='right';
         this.score=0;this.timer=60;
-        this.genQuestion();
-        this.placeFood();
-        this.updateHUD();
+        this.newQuestion();this.placeFood();this.updateHUD();
       }
 
-      /* === Preguntas === */
-      genQuestion(){
-        const kind=['simpl','ampl','sum','mul'][rnd(0,3)];
+      /* preguntas */
+      newQuestion(){
+        const typ=['simpl','ampl','sum','mul'][rnd(0,3)];
         let a,b,c,d,txt,ans,wr=[];
-        if(kind==='simpl'){
-          a=rnd(2,9);b=rnd(2,9);
-          const f=rnd(2,5);
+        if(typ==='simpl'){
+          a=rnd(2,9);b=rnd(2,9);const f=rnd(2,5);
           txt=`\\dfrac{${a*f}}{${b*f}}`;ans=`${a}/${b}`;
           wr=[`${a}/${b+1}`,`${a+1}/${b}`,`${a+1}/${b+1}`];
-        }else if(kind==='ampl'){
-          a=rnd(1,4);b=rnd(1,4);
-          const f=rnd(2,5);
+        }else if(typ==='ampl'){
+          a=rnd(1,4);b=rnd(1,4);const f=rnd(2,5);
           txt=`\\dfrac{${a}}{${b}}`;ans=`${a*f}/${b*f}`;
           wr=[`${a*(f+1)}/${b*(f+1)}`,`${a*f}/${b*(f+1)}`,`${a*(f+1)}/${b*f}`];
-        }else if(kind==='sum'){
+        }else if(typ==='sum'){
           a=rnd(1,5);b=rnd(1,5);c=rnd(1,5);d=rnd(1,5);
           txt=`\\dfrac{${a}}{${b}}+\\dfrac{${c}}{${d}}`;
-          const num=a*d+c*b,den=b*d;
-          ans=`${num}/${den}`;
+          const num=a*d+c*b,den=b*d;ans=`${num}/${den}`;
           wr=[`${num+1}/${den}`,`${num}/${den+1}`,`${Math.max(1,num-1)}/${den}`];
         }else{
           a=rnd(1,5);b=rnd(1,5);c=rnd(1,5);d=rnd(1,5);
@@ -208,63 +174,59 @@
         katex.render(txt+'\\,=\\,?',$('question'));
       }
 
-      /* === Comida === */
+      /* comida */
       placeFood(){
-        const values=[...this.q.wr,this.q.ans];
+        const vals=[...this.q.wr,this.q.ans];
         this.food=[];
-        values.forEach(v=>{
-          let ok=false,p,tries=0;
-          while(!ok&&tries++<200){
-            p={x:rnd(0,13),y:rnd(0,13),val:v};
-            ok=!this.occupied(p)&&!this.nearHead(p,4);
+        vals.forEach(v=>{
+          let p,ok=false,tries=0;
+          while(!ok&&tries++<300){
+            p={x:rnd(0,this.grid-1),y:rnd(0,this.grid-1),val:v};
+            ok=!this.occ(p)&&!this.nearHead(p,4);
           }
           this.food.push(p);
         });
       }
-      occupied(p){return this.snake.some(s=>s.x===p.x&&s.y===p.y)||
-                       this.food.some(f=>f.x===p.x&&f.y===p.y);}
+      occ(p){return this.snake.some(s=>s.x===p.x&&s.y===p.y)||
+                     this.food.some(f=>f.x===p.x&&f.y===p.y);}
       nearHead(p,d){const h=this.snake[0];
         return Math.abs(h.x-p.x)<=d&&Math.abs(h.y-p.y)<=d;}
 
-      /* === Dibujo === */
+      /* dibujo */
       draw(){
         this.ctx.clearRect(0,0,this.cv.width,this.cv.height);
         this.snake.forEach((s,i)=>{
           this.ctx.fillStyle=i?css('--snake'):css('--accent');
-          this.ctx.fillRect(s.x*this.size,s.y*this.size,
-                            this.size-1,this.size-1);
+          this.ctx.fillRect(s.x*this.size,s.y*this.size,this.size-1,this.size-1);
         });
         this.food.forEach(f=>{
           this.ctx.fillStyle=css('--food');
-          this.ctx.beginPath();
           const r=this.size*0.95/2;
-          this.ctx.arc(f.x*this.size+this.size/2,
-                       f.y*this.size+this.size/2,r,0,2*Math.PI);
+          this.ctx.beginPath();
+          this.ctx.arc(f.x*this.size+this.size/2,f.y*this.size+this.size/2,r,0,2*Math.PI);
           this.ctx.fill();
           this.ctx.fillStyle='#fff';
-          this.ctx.font='bold 20px Roboto';
+          this.ctx.font='bold 21px Roboto';
           this.ctx.textAlign='center';this.ctx.textBaseline='middle';
-          this.ctx.fillText(f.val,f.x*this.size+this.size/2,
-                                   f.y*this.size+this.size/2+1);
+          this.ctx.fillText(f.val,f.x*this.size+this.size/2,f.y*this.size+this.size/2+1);
         });
       }
 
-      /* === Movimiento & lógica === */
+      /* movimiento */
       move(){
         this.dir=this.next;
         const h={...this.snake[0]};
-        if(this.dir==='up')   h.y--;
-        if(this.dir==='down') h.y++;
-        if(this.dir==='left') h.x--;
+        if(this.dir==='up')h.y--;
+        if(this.dir==='down')h.y++;
+        if(this.dir==='left')h.x--;
         if(this.dir==='right')h.x++;
         if(this.hit(h)){this.gameOver();return;}
         this.snake.unshift(h);
 
         const eat=this.food.findIndex(f=>f.x===h.x&&f.y===h.y);
         if(eat!==-1){
-          const v=this.food[eat].val;
-          if(v===this.q.ans){
-            this.score++;this.genQuestion();this.placeFood();this.timer=60;
+          if(this.food[eat].val===this.q.ans){
+            this.score++;this.newQuestion();this.placeFood();this.timer=60;
           }else{
             this.score=Math.max(0,this.score-1);
             if(this.snake.length>3)this.snake.pop();
@@ -273,42 +235,39 @@
           this.updateHUD();
         }else this.snake.pop();
       }
-      hit(h){return h.x<0||h.y<0||h.x>13||h.y>13||
+      hit(h){return h.x<0||h.y<0||h.x>=this.grid||h.y>=this.grid||
               this.snake.slice(1).some(s=>s.x===h.x&&s.y===h.y);}
 
-      /* === HUD & temporizador === */
+      /* HUD y temporizador */
       updateHUD(){
         $('score').textContent='Puntuación '+this.score;
         $('timer').textContent='Tiempo '+this.timer+' s';
       }
       tick(){
-        if(--this.timer<=0){
-          this.genQuestion();this.placeFood();this.timer=60;
-        }
+        if(--this.timer<=0){this.newQuestion();this.placeFood();this.timer=60;}
         this.updateHUD();
       }
 
-      /* === Bucle === */
+      /* bucle: más lento (350 ms) */
       start(){
         this.init();
-        this.loop =setInterval(()=>{this.move();this.draw();},200);
+        this.loop=setInterval(()=>{this.move();this.draw();},350);
         this.clock=setInterval(()=>this.tick(),1000);
       }
       stop(){clearInterval(this.loop);clearInterval(this.clock);}
 
-      /* === Fin de partida/sesión === */
+      /* fin */
       gameOver(){
         this.stop();this.scores.push(this.score);
         $('final').textContent='Puntuación '+this.score;
-        if(this.scores.length<this.gamesMax)show('gameOver');
-        else this.sessionOver();
+        if(this.scores.length<this.gamesMax)show('gameOver');else this.session();
       }
-      sessionOver(){
+      session(){
         $('history').innerHTML=this.scores.map((s,i)=>`Partida ${i+1}: ${s}`).join('<br>');
         show('sessionOver');
       }
 
-      /* === Controles === */
+      /* controles */
       events(){
         $('btnStart').onclick=()=>{show('game');this.start()};
         $('btnAgain').onclick=()=>{show('game');this.start()};
@@ -321,14 +280,12 @@
           if(e.key==='ArrowRight'&&this.dir!=='left')this.next='right';
         });
 
-        /* táctil */
         this.cv.addEventListener('touchstart',e=>{
-          this.touchX=e.touches[0].clientX;this.touchY=e.touches[0].clientY;
+          this.tX=e.touches[0].clientX;this.tY=e.touches[0].clientY;
         },{passive:false});
         this.cv.addEventListener('touchmove',e=>{
-          if(!this.touchX||!this.touchY)return;
-          const dx=e.touches[0].clientX-this.touchX;
-          const dy=e.touches[0].clientY-this.touchY;
+          if(!this.tX||!this.tY)return;
+          const dx=e.touches[0].clientX-this.tX;const dy=e.touches[0].clientY-this.tY;
           if(Math.abs(dx)>30||Math.abs(dy)>30){
             if(Math.abs(dx)>Math.abs(dy)){
               if(dx>0&&this.dir!=='left')this.next='right';
@@ -337,21 +294,20 @@
               if(dy>0&&this.dir!=='up')this.next='down';
               if(dy<0&&this.dir!=='down')this.next='up';
             }
-            this.touchX=e.touches[0].clientX;this.touchY=e.touches[0].clientY;
+            this.tX=e.touches[0].clientX;this.tY=e.touches[0].clientY;
           }
         },{passive:false});
-        this.cv.addEventListener('touchend',()=>{this.touchX=this.touchY=null});
+        this.cv.addEventListener('touchend',()=>{this.tX=this.tY=null});
       }
     }
 
-    /* pantalla */
-    const show=id=>{
+    /* helpers pantalla */
+    function show(id){
       ['welcome','game','gameOver','sessionOver']
         .forEach(s=>$(s).classList.remove('active'));
       $(id).classList.add('active');
-    };
+    }
 
-    /* iniciar */
     document.addEventListener('DOMContentLoaded',()=>new SnakeMath());
   </script>
 </body>
