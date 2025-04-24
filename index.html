@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Snake Math – Fracciones</title>
+
+  <!-- KaTeX para la operación -->
+  <link rel="stylesheet"
+        href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.15.3/katex.min.css">
+  <script defer
+          src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.15.3/katex.min.js"></script>
+
+  <!-- Fuente Roboto -->
+  <link rel="stylesheet"
+        href="https://fonts.googleapis.com/css?family=Roboto:400,700&display=swap">
+
+  <style>
+    :root{
+      --primary:#2196F3;
+      --bg:#F0F8FF;
+      --text:#333;
+      --accent:#FF9800;
+      --food:#E53935;
+      --snake:#4CAF50;
+      --timer:#FF5722;
+    }
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{
+      font-family:'Roboto',sans-serif;
+      background:var(--bg);
+      color:var(--text);
+      display:flex;
+      flex-direction:column;
+      align-items:center;
+      height:100vh;
+      overflow:hidden;          /* sin scroll */
+    }
+    .screen{
+      display:none;
+      flex-direction:column;
+      align-items:center;
+      justify-content:center;
+      gap:1rem;
+      padding:1rem;
+      width:100%;
+      height:100%;
+      max-width:600px;
+      animation:fade .4s ease-out;
+    }
+    .active{display:flex}
+    @keyframes fade{from{opacity:0;transform:translateY(20px)}to{opacity:1}}
+    h1{color:var(--primary);font-size:2rem;text-align:center;padding-top:.5rem}
+    button{
+      background:var(--primary);
+      color:#fff;
+      border:none;
+      padding:.65rem 1.5rem;
+      font-size:1rem;
+      border-radius:25px;
+      cursor:pointer;
+      transition:.25s;
+      box-shadow:0 4px 6px rgba(0,0,0,.1)
+    }
+    button:hover{background:#1976D2;transform:scale(1.05)}
+    #hud{
+      display:flex;
+      flex-direction:column;
+      gap:.4rem;
+      align-items:center;
+      width:100%;
+    }
+    .badge{
+      background:#fff;
+      padding:.5rem 1rem;
+      border-radius:20px;
+      font-size:1.1rem;
+      box-shadow:0 2px 4px rgba(0,0,0,.08)
+    }
+    #game-area{
+      position:relative;
+      width:90vmin;          /* se adapta a alto y ancho de viewport */
+      max-width:380px;
+      aspect-ratio:1/1;      /* siempre cuadrado */
+    }
+    canvas{
+      width:100%;
+      height:100%;
+      background:#fff;
+      border:2px solid var(--primary);
+      border-radius:10px;
+      touch-action:none;
+    }
+    @media(min-width:700px){
+      h1{font-size:2.4rem}
+      button{font-size:1.1rem}
+    }
+  </style>
+</head>
+
+<body>
+  <!-- Pantalla inicial -->
+  <section id="welcome" class="screen active">
+    <h1>Snake Math<br><small style="font-size:1rem">Fracciones divertidas</small></h1>
+    <button id="btnStart">¡Jugar!</button>
+  </section>
+
+  <!-- Juego -->
+  <section id="game" class="screen">
+    <div id="hud">
+      <div id="question" class="badge"></div>
+      <div id="timer"    class="badge">Tiempo 60 s</div>
+      <div id="score"    class="badge">Puntuación 0</div>
+    </div>
+    <div id="game-area">
+      <canvas id="board"></canvas>
+    </div>
+  </section>
+
+  <!-- Fin de partida -->
+  <section id="gameOver" class="screen">
+    <h1>¡Buen intento!</h1>
+    <div id="final" class="badge">Puntuación 0</div>
+    <button id="btnAgain">Intentar otra vez</button>
+  </section>
+
+  <!-- Fin de sesión -->
+  <section id="sessionOver" class="screen">
+    <h1>Sesión terminada</h1>
+    <div id="history" class="badge" style="max-height:40vh;overflow:auto"></div>
+    <button id="btnNew">Nueva sesión</button>
+  </section>
+
+  <script>
+    /* ========= utilidades ========= */
+    const $ = id => document.getElementById(id);
+    const cssVal = name => getComputedStyle(document.documentElement)
+                             .getPropertyValue(name).trim();
+    const rnd = (m,n)=>Math.floor(Math.random()*(n-m+1))+m;
+
+    /* ========= Juego ========= */
+    class SnakeMath{
+      constructor(){
+        this.cv   = $('board');
+        this.ctx  = this.cv.getContext('2d');
+        this.size = 20;                       // tamaño de celda
+        this.cv.width  = 380;
+        this.cv.height = 380;
+
+        this.dir  ='right';
+        this.next ='right';
+        this.snake=[];
+        this.food=[];
+        this.score=0;
+
+        this.timer=60;
+        this.loop  = null;
+        this.clock = null;
+
+        this.scores=[];
+        this.gamesMax=10;
+
+        this.touchX=null;this.touchY=null;
+
+        this.init();
+        this.events();
+      }
+
+      init(){
+        this.snake=[
+          {x:6,y:10},{x:5,y:10},{x:4,y:10}
+        ];
+        this.dir=this.next='right';
+        this.score=0;
+        this.timer=60;
+        this.genQuestion();
+        this.placeFood();
+        this.updateHUD();
+      }
+
+      genQuestion(){
+        const kinds=['simpl','ampl','sum','mul'];
+        const k=kinds[rnd(0,3)];
+        let a,b,c,d,txt,ans,wr=[];
+        if(k==='simpl'){             // simplificar fracción
+          a=rnd(2,9); b=rnd(2,9);
+          const f=rnd(2,5);
+          const n=a*f, m=b*f;
+          txt=`\\dfrac{${n}}{${m}}`;
+          ans=`${a}/${b}`;
+          wr=[`${a}/${b+1}`,`${a+1}/${b}`,`${a+1}/${b+1}`];
+        }else if(k==='ampl'){        // amplificar
+          a=rnd(1,4); b=rnd(1,4);
+          const f=rnd(2,5);
+          txt=`\\dfrac{${a}}{${b}}`;
+          ans=`${a*f}/${b*f}`;
+          wr=[`${a*(f+1)}/${b*(f+1)}`,
+              `${a*f}/${b*(f+1)}`,
+              `${a*(f+1)}/${b*f}`];
+        }else if(k==='sum'){         // suma
+          a=rnd(1,5); b=rnd(1,5);
+          c=rnd(1,5); d=rnd(1,5);
+          txt=`\\dfrac{${a}}{${b}} + \\dfrac{${c}}{${d}}`;
+          const num=a*d+c*b, den=b*d;
+          ans=`${num}/${den}`;
+          wr=[`${num+1}/${den}`,`${num}/${den+1}`,`${Math.max(1,num-1)}/${den}`];
+        }else{                       // multiplicación
+          a=rnd(1,5); b=rnd(1,5);
+          c=rnd(1,5); d=rnd(1,5);
+          txt=`\\dfrac{${a}}{${b}} \\times \\dfrac{${c}}{${d}}`;
+          ans=`${a*c}/${b*d}`;
+          wr=[`${a*c+1}/${b*d}`,`${a*c}/${b*d+1}`,`${Math.max(1,a*c-1)}/${b*d}`];
+        }
+        this.question={txt,ans,wr};
+        katex.render(txt+'\\,=\\,?',$('question'));
+      }
+
+      placeFood(){
+        const arr=[...this.question.wr,this.question.ans];
+        this.food=[];
+        arr.forEach(v=>{
+          let p,tries=0,ok;
+          do{
+            p={x:rnd(0,this.cv.width/this.size-1),
+               y:rnd(0,this.cv.height/this.size-1),
+               val:v};
+            ok=!this.occupied(p)&&!this.nearHead(p,3);
+          }while(!ok&&++tries<100);
+          this.food.push(p);
+        });
+      }
+      occupied(p){
+        return this.snake.some(s=>s.x===p.x&&s.y===p.y) ||
+               this.food .some(f=>f.x===p.x&&f.y===p.y);
+      }
+      nearHead(p,d){
+        const h=this.snake[0];
+        return Math.abs(h.x-p.x)<=d && Math.abs(h.y-p.y)<=d;
+      }
+
+      draw(){
+        this.ctx.clearRect(0,0,this.cv.width,this.cv.height);
+        // snake
+        this.snake.forEach((s,i)=>{
+          this.ctx.fillStyle=i?cssVal('--snake'):cssVal('--accent');
+          this.ctx.fillRect(s.x*this.size,s.y*this.size,
+                            this.size-1,this.size-1);
+        });
+        // food
+        this.food.forEach(f=>{
+          this.ctx.fillStyle=cssVal('--food');
+          this.ctx.beginPath();
+          this.ctx.arc(f.x*this.size+this.size/2,
+                       f.y*this.size+this.size/2,
+                       this.size/1.5,0,2*Math.PI);
+          this.ctx.fill();
+          this.ctx.fillStyle='#fff';
+          this.ctx.font='bold 14px Roboto';
+          this.ctx.textAlign='center';
+          this.ctx.textBaseline='middle';
+          this.ctx.fillText(f.val,
+               f.x*this.size+this.size/2,
+               f.y*this.size+this.size/2);
+        });
+      }
+
+      move(){
+        this.dir=this.next;
+        const h={...this.snake[0]};
+        if(this.dir==='up')h.y--;
+        if(this.dir==='down')h.y++;
+        if(this.dir==='left')h.x--;
+        if(this.dir==='right')h.x++;
+        if(this.hit(h)){this.gameOver();return;}
+        this.snake.unshift(h);
+
+        const eat=this.food.findIndex(f=>f.x===h.x && f.y===h.y);
+        if(eat!==-1){
+          const v=this.food[eat].val;
+          if(v===this.question.ans){
+            this.score++;
+            this.genQuestion();
+            this.placeFood();
+            this.timer=60;
+          }else{
+            this.score=Math.max(0,this.score-1);
+            if(this.snake.length>3) this.snake.pop();
+            this.food.splice(eat,1);
+          }
+          this.updateHUD();
+        }else{
+          this.snake.pop();
+        }
+      }
+      hit(h){
+        return h.x<0||h.y<0||
+               h.x>=this.cv.width/this.size||
+               h.y>=this.cv.height/this.size||
+               this.snake.slice(1).some(s=>s.x===h.x&&s.y===h.y);
+      }
+
+      updateHUD(){
+        $('score').textContent='Puntuación '+this.score;
+        $('timer').textContent='Tiempo '+this.timer+' s';
+      }
+
+      tick(){
+        this.timer--;
+        if(this.timer<=0){
+          this.genQuestion();
+          this.placeFood();
+          this.timer=60;
+        }
+        this.updateHUD();
+      }
+
+      gameLoopFn(){
+        this.move();
+        this.draw();
+      }
+
+      start(){
+        this.init();
+        this.loop =setInterval(()=>this.gameLoopFn(),200);
+        this.clock=setInterval(()=>this.tick(),1000);
+      }
+
+      stop(){
+        clearInterval(this.loop);
+        clearInterval(this.clock);
+      }
+
+      gameOver(){
+        this.stop();
+        this.scores.push(this.score);
+        $('final').textContent='Puntuación '+this.score;
+        if(this.scores.length<this.gamesMax){
+          show('gameOver');
+        }else{
+          this.showSession();
+        }
+      }
+
+      showSession(){
+        const hist=$('history');
+        hist.innerHTML=this.scores.map((s,i)=>`Partida ${i+1}: ${s}`)
+                                   .join('<br>');
+        show('sessionOver');
+      }
+
+      events(){
+        // botones
+        $('btnStart').onclick=()=>{show('game');this.start()};
+        $('btnAgain').onclick=()=>{show('game');this.start()};
+        $('btnNew').onclick=()=>{
+          this.scores=[];show('welcome')
+        };
+        // teclado
+        document.addEventListener('keydown',e=>{
+          const k=e.key;
+          if(k==='ArrowUp' && this.dir!=='down')   this.next='up';
+          if(k==='ArrowDown' && this.dir!=='up')   this.next='down';
+          if(k==='ArrowLeft' && this.dir!=='right')this.next='left';
+          if(k==='ArrowRight'&& this.dir!=='left') this.next='right';
+        });
+        // táctil
+        this.cv.addEventListener('touchstart',e=>{
+          this.touchX=e.touches[0].clientX;
+          this.touchY=e.touches[0].clientY;
+        },{passive:false});
+        this.cv.addEventListener('touchmove',e=>{
+          if(!this.touchX||!this.touchY)return;
+          const dx=e.touches[0].clientX-this.touchX;
+          const dy=e.touches[0].clientY-this.touchY;
+          if(Math.abs(dx)>30||Math.abs(dy)>30){
+            if(Math.abs(dx)>Math.abs(dy)){
+              if(dx>0 && this.dir!=='left') this.next='right';
+              if(dx<0 && this.dir!=='right')this.next='left';
+            }else{
+              if(dy>0 && this.dir!=='up')   this.next='down';
+              if(dy<0 && this.dir!=='down') this.next='up';
+            }
+            this.touchX=e.touches[0].clientX;
+            this.touchY=e.touches[0].clientY;
+          }
+        },{passive:false});
+        this.cv.addEventListener('touchend',()=>{this.touchX=null;this.touchY=null});
+      }
+    }
+
+    /* ========= helpers ========= */
+    function show(id){
+      ['welcome','game','gameOver','sessionOver']
+        .forEach(s=>$(s).classList.remove('active'));
+      $(id).classList.add('active');
+    }
+
+    /* ========= iniciar ========= */
+    document.addEventListener('DOMContentLoaded',()=>new SnakeMath());
+  </script>
+</body>
+</html>
